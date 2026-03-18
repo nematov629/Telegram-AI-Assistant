@@ -2,7 +2,7 @@
 
 ## Overview
 
-pnpm workspace monorepo using TypeScript. Each package manages its own dependencies.
+pnpm workspace monorepo using TypeScript. Hosts a Telegram AI bot that uses OpenAI (via Replit AI Integrations) to respond to messages with full conversation history.
 
 ## Stack
 
@@ -15,6 +15,18 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - **Validation**: Zod (`zod/v4`), `drizzle-zod`
 - **API codegen**: Orval (from OpenAPI spec)
 - **Build**: esbuild (CJS bundle)
+- **AI**: OpenAI gpt-5.2 via Replit AI Integrations (`@workspace/integrations-openai-ai-server`)
+- **Bot**: Telegram webhook bot (`node-telegram-bot-api`, webhook at `/api/telegram/webhook`)
+
+## Telegram Bot
+
+- Webhook endpoint: `POST /api/telegram/webhook`
+- Setup webhook: `GET /api/telegram/setup-webhook`
+- Check webhook: `GET /api/telegram/webhook-info`
+- Bot commands: `/start` (greeting), `/reset` (clear conversation history)
+- Each Telegram chat ID gets its own conversation stored in the DB
+- Last 50 messages of history are sent to OpenAI as context
+- Secrets required: `TELEGRAM_BOT_TOKEN`
 
 ## Structure
 
