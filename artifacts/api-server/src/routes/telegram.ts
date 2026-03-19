@@ -1,62 +1,51 @@
 import { Router, type IRouter, type Request, type Response } from "express";
-import { db, conversations, messages } from "@workspace/db";
+import { Telegraf, Markup } from "telegraf";
 import { openai } from "@workspace/integrations-openai-ai-server";
-import { eq } from "drizzle-orm";
 
 const router: IRouter = Router();
 
-const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-const TELEGRAM_API = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}`;
-
-async function sendTelegramMessage(chatId: number, text: string): Promise<void> {
-  await fetch(`${TELEGRAM_API}/sendMessage`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text,
-      parse_mode: "Markdown",
-    }),
-  });
+if (!process.env.TELEGRAM_BOT_TOKEN) {
+  throw new Error("TELEGRAM_BOT_TOKEN is not set");
 }
 
-async function sendChatAction(chatId: number, action: string): Promise<void> {
-  await fetch(`${TELEGRAM_API}/sendChatAction`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ chat_id: chatId, action }),
-  });
-}
+const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
 
-async function getOrCreateConversation(chatId: number): Promise<number> {
-  const title = `telegram_chat_${chatId}`;
-  const existing = await db
-    .select()
-    .from(conversations)
-    .where(eq(conversations.title, title))
-    .limit(1);
+const userState = new Map<number, string>();
 
-  if (existing.length > 0) {
-    return existing[0].id;
+async function askAI(mode: string, text: string): Promise<string> {
+  let prompt = "";
+
+  if (mode === "translation") {
+    prompt = `You are an English-Uzbek translator.
+Translate the following word or sentence into Uzbek naturally.
+Also provide:
+- Literal meaning
+- Usage notes if relevant
+
+Word/Sentence: ${text}`;
+  } else if (mode === "synonyms") {
+    prompt = `You are an English vocabulary teacher for Uzbek speakers.
+For the word: "${text}"
+Provide:
+1. 5–7 English synonyms
+2. For each synonym: Uzbek meaning in parentheses
+3. One short example sentence for each synonym`;
+  } else if (mode === "sentence") {
+    prompt = `You are an English teacher.
+Using the word or phrase: "${text}"
+Write exactly 8 example sentences.
+Number them 1–8.
+Use different tenses and contexts. Keep sentences clear and natural.`;
+  } else if (mode === "grammar") {
+    prompt = `You are an English grammar checker for Uzbek learners.
+Analyze this sentence: "${text}"
+
+Provide:
+1. ✅ Corrected sentence (if errors found, otherwise confirm it's correct)
+2. ❌ Errors found (list each error and why it's wrong)
+3. 📚 Grammar rule (name the tense or grammar point used)
+4. 💡 Explanation (simple explanation in both English and Uzbek)`;
   }
-
-  const [created] = await db
-    .insert(conversations)
-    .values({ title })
-    .returning({ id: conversations.id });
-
-  return created.id;
-}
-
-async function askEnglishTeacher(sentence: string): Promise<string> {
-  const prompt = `You are an English teacher.
-
-1. Translate the sentence into Uzbek naturally
-2. Give key vocabulary (English → Uzbek)
-3. Give 2 example sentences
-4. Explain grammar simply
-
-Sentence: ${sentence}`;
 
   const response = await openai.chat.completions.create({
     model: "gpt-5-mini",
@@ -64,79 +53,93 @@ Sentence: ${sentence}`;
     messages: [{ role: "user", content: prompt }],
   });
 
-  return response.choices[0]?.message?.content ?? "Sorry, I couldn't generate a response.";
+  return response.choices[0]?.message?.content ?? "Javob olishda xatolik yuz berdi.";
 }
 
-router.post("/telegram/webhook", async (req: Request, res: Response) => {
-  res.sendStatus(200);
+bot.start((ctx) => {
+  ctx.reply(
+    "Assalomu aleykum! 👋 -- Hello!\nQanday yordam kerak? -- How can I help you?",
+    Markup.inlineKeyboard([
+      [Markup.button.callback("🔤 Translation", "translation")],
+      [Markup.button.callback("📚 Synonyms", "synonyms")],
+      [Markup.button.callback("✍️ Sentence", "sentence")],
+      [Markup.button.callback("✅ Grammar", "grammar")],
+    ])
+  );
+});
 
-  const update = req.body;
+bot.on("callback_query", async (ctx) => {
+  if (!("data" in ctx.callbackQuery)) return;
 
-  if (!update.message) return;
+  const choice = ctx.callbackQuery.data;
+  const userId = ctx.from.id;
 
-  const message = update.message;
-  const chatId: number = message.chat.id;
-  const text: string | undefined = message.text;
+  userState.set(userId, choice);
 
-  if (!text) return;
+  const prompts: Record<string, string> = {
+    translation: "So'z yoki gapni yozing, men Uzbekchaga tarjima qilaman:\n_Write a word or sentence to translate into Uzbek:_",
+    synonyms: "So'zni yozing, men sinonimlarini chiqaraman:\n_Write a word to get its synonyms:_",
+    sentence: "So'zni yozing, men 8 ta jumla tuzaman:\n_Write a word to get 8 example sentences:_",
+    grammar: "Gap yozing, men grammatik xatolarni tekshiraman:\n_Write a sentence to check its grammar:_",
+  };
 
-  if (text === "/start") {
-    await sendTelegramMessage(
-      chatId,
-      "👋 *Welcome!* Send me any English sentence and I will:\n\n" +
-        "1️⃣ Translate it into Uzbek\n" +
-        "2️⃣ Give key vocabulary (English → Uzbek)\n" +
-        "3️⃣ Give 2 example sentences\n" +
-        "4️⃣ Explain the grammar\n\n" +
-        "Just send me an English sentence to get started!"
+  await ctx.reply(prompts[choice] ?? "So'z yozing:", { parse_mode: "Markdown" });
+  await ctx.answerCbQuery();
+});
+
+bot.on("text", async (ctx) => {
+  const userId = ctx.from.id;
+  const text = ctx.message.text;
+
+  if (text.startsWith("/")) return;
+
+  const mode = userState.get(userId);
+
+  if (!mode) {
+    await ctx.reply(
+      "Iltimos, avval bo'limni tanlang 👇\n_Please select a mode first:_",
+      {
+        parse_mode: "Markdown",
+        ...Markup.inlineKeyboard([
+          [Markup.button.callback("🔤 Translation", "translation")],
+          [Markup.button.callback("📚 Synonyms", "synonyms")],
+          [Markup.button.callback("✍️ Sentence", "sentence")],
+          [Markup.button.callback("✅ Grammar", "grammar")],
+        ]),
+      }
     );
     return;
   }
 
+  await ctx.sendChatAction("typing");
+
   try {
-    await sendChatAction(chatId, "typing");
-
-    const reply = await askEnglishTeacher(text);
-
-    const conversationId = await getOrCreateConversation(chatId);
-    await db.insert(messages).values([
-      { conversationId, role: "user", content: text },
-      { conversationId, role: "assistant", content: reply },
-    ]);
-
-    await sendTelegramMessage(chatId, reply);
+    const reply = await askAI(mode, text);
+    await ctx.reply(reply);
   } catch (err) {
-    console.error("Error handling Telegram message:", err);
-    await sendTelegramMessage(
-      chatId,
-      "Sorry, something went wrong. Please try again."
-    );
+    console.error("AI error:", err);
+    await ctx.reply("Xatolik yuz berdi. Iltimos qayta urinib ko'ring.");
   }
 });
+
+router.post("/telegram/webhook", bot.webhookCallback("/api/telegram/webhook"));
 
 router.get("/telegram/setup-webhook", async (req: Request, res: Response) => {
   const host = req.headers["x-forwarded-host"] ?? req.headers.host;
   const protocol = req.headers["x-forwarded-proto"] ?? "https";
   const webhookUrl = `${protocol}://${host}/api/telegram/webhook`;
 
-  const response = await fetch(`${TELEGRAM_API}/setWebhook`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ url: webhookUrl }),
-  });
-  const result = (await response.json()) as { ok: boolean; description?: string };
-
-  if (result.ok) {
+  const result = await bot.telegram.setWebhook(webhookUrl);
+  if (result) {
     res.json({ success: true, webhookUrl });
   } else {
-    res.status(500).json({ success: false, error: result.description });
+    res.status(500).json({ success: false });
   }
 });
 
 router.get("/telegram/webhook-info", async (_req: Request, res: Response) => {
-  const response = await fetch(`${TELEGRAM_API}/getWebhookInfo`);
-  const result = await response.json();
-  res.json(result);
+  const info = await bot.telegram.getWebhookInfo();
+  res.json(info);
 });
 
 export default router;
