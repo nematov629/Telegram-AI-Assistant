@@ -1,0 +1,81 @@
+const { Telegraf, Markup } = require('telegraf');
+
+// Bot tokenni .env fayldan olamiz
+const bot = new Telegraf(process.env.BOT_TOKEN);
+
+// User state saqlash uchun oddiy object (memory)
+let userState = {};
+
+// /start command
+bot.start((ctx) => {
+  ctx.reply(
+    "Assalomu aleykum! -- Hello\nQanday yordam kerak? -- How can I help you?",
+    Markup.inlineKeyboard([
+      [Markup.button.callback('Translation', 'translation')],
+      [Markup.button.callback('Synonyms', 'synonyms')],
+      [Markup.button.callback('Sentence', 'sentence')],
+      [Markup.button.callback('Grammar', 'grammar')],
+    ])
+  );
+});
+
+// Callback query handler (menu tanlansa)
+bot.on('callback_query', async (ctx) => {
+  const choice = ctx.callbackQuery.data;
+  const userId = ctx.from.id;
+
+  userState[userId] = choice;
+
+  if (choice === 'translation') {
+    await ctx.reply("So'zni yozing, men tarjimasini chiqaraman:");
+  } else if (choice === 'synonyms') {
+    await ctx.reply("So'zni yozing, men sinonimlarini chiqaraman:");
+  } else if (choice === 'sentence') {
+    await ctx.reply("So'zni yozing, men 8 ta jumla bilan ishlayman:");
+  } else if (choice === 'grammar') {
+    await ctx.reply("Gap yozing, men grammatik xatolarni tekshiraman:");
+  }
+
+  await ctx.answerCbQuery(); // Callbackni tugatish
+});
+
+// User xabarini qabul qilish
+bot.on('text', async (ctx) => {
+  const userId = ctx.from.id;
+  const choice = userState[userId];
+  const text = ctx.message.text;
+
+  if (!choice) return ctx.reply("Iltimos, avval bo'limni tanlang.");
+
+  if (choice === 'translation') {
+    // Faqat tarjima chiqadi (example)
+    ctx.reply(`Tarjima: [${text} -> Tarjima]`);
+  } else if (choice === 'synonyms') {
+    // Faqat sinonimlar
+    ctx.reply(`Sinonimlar: [${text} -> Syn1, Syn2, Syn3]`);
+  } else if (choice === 'sentence') {
+    // 8 ta jumla (sample)
+    const sentences = Array.from({ length: 8 }, (_, i) => `${i + 1}. ${text} bilan jumla ${i + 1}`);
+    ctx.reply(sentences.join('\n'));
+  } else if (choice === 'grammar') {
+    // Grammar tekshirish sample
+    ctx.reply(
+      `Xato: None (sample)\nZamon: Present Simple\nTo'g'ri gap: ${text} (sample)`
+    );
+  }
+});
+
+// Botni ishga tushirish
+bot.launch();
+console.log("Bot ishga tushdi!");
+
+// Replit 24/7 usuli uchun ping endpoint
+const express = require('express');
+const app = express();
+
+app.get('/api/healthz', (req, res) => {
+  res.json({ status: 'ok' });
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Server port ${PORT}da ishlayapti`));
