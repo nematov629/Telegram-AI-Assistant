@@ -122,7 +122,10 @@ bot.on("text", async (ctx) => {
   }
 });
 
-router.post("/telegram/webhook", bot.webhookCallback("/api/telegram/webhook"));
+router.post("/telegram/webhook", async (req: Request, res: Response) => {
+  res.sendStatus(200);
+  await bot.handleUpdate(req.body);
+});
 
 router.get("/telegram/setup-webhook", async (req: Request, res: Response) => {
   const host = req.headers["x-forwarded-host"] ?? req.headers.host;
