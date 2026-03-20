@@ -1,0 +1,55 @@
+# Telegram AI Assistant - Justin
+
+Python + Telegram bot (Python Telegram Bot v20 + OpenAI)  
+Ingliz-Uzbek tili bo‘yicha interaktiv yordamchi.
+
+---
+
+## 🚀 Xususiyatlar
+
+1. `/start` bosilganda:
+   - `Assalomu aleykum! 👋 Hello! Men Justin — ingliz tili yordamchingizman.`
+   - Bosh menyu bilan 3 ta tugma:
+     - `correct`
+     - `Speaking Part 2`
+     - `Writing`
+
+2. `correct`:
+   - “Inglizcha gap yoki so‘zni yozing” deb so‘raydi.
+   - OpenAI orqali:
+     - xatolar
+     - zamon (tense)
+     - to‘g‘ri shakl (`Corrected:`)
+
+3. `Speaking Part 2`:
+   - O‘zi bo‘lim: `IELTS`, `CEFR`, `Back`
+   - `IELTS / CEFR` tanlanadi.
+   - So‘ng:
+     - `IELTS`: “Describe a memorable journey…”
+     - `CEFR`: “Talk about your favorite hobby…”
+   - Foydalanuvchi javob yo‘zadi, bot OpenAI bilan:
+     - tahlil
+     - leksika va grammatikani tuzatish
+
+4. `Writing`:
+   - “matn jo‘nat” deb so‘raydi.
+   - OpenAI bilan polish + professional stil.
+
+---
+
+## 🛠️ Qanday ishga tushirish
+
+1. Kod joyi:
+   - `my-bot/bot.py`
+
+2. Muhit:
+   - `python3` (macOS)
+   - Kutubxonalar:
+     - `python-telegram-bot==20.4`
+     - `openai`
+     - `python-dotenv`
+
+3. O‘rnatish:
+   ```bash
+   cd /Users/uzmacbook/Desktop/Telegram-AI-Assistant/my-bot
+   python3 -m pip install python-telegram-bot==20.4 openai python-dotenv
