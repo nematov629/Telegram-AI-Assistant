@@ -17,34 +17,40 @@ async function askAI(mode: string, text: string): Promise<string> {
 
   if (mode === "translation") {
     prompt = `You are an English-Uzbek translator.
-Translate the following word or sentence into Uzbek naturally.
-Also provide:
-- Literal meaning
-- Usage notes if relevant
+Translate the following word or sentence into natural Uzbek.
+Return ONLY the Uzbek translation.
+No explanations, no bullet points, no extra text.
 
-Word/Sentence: ${text}`;
+Text: ${text}`;
   } else if (mode === "synonyms") {
     prompt = `You are an English vocabulary teacher for Uzbek speakers.
 For the word: "${text}"
-Provide:
-1. 5–7 English synonyms
-2. For each synonym: Uzbek meaning in parentheses
-3. One short example sentence for each synonym`;
+Return ONLY 5–7 English synonyms.
+Output format: one line per synonym: <synonym> - <Uzbek meaning>.
+No examples and no explanations.
+
+Remember: output only synonyms lines.`;
   } else if (mode === "sentence") {
     prompt = `You are an English teacher.
 Using the word or phrase: "${text}"
 Write exactly 8 example sentences.
-Number them 1–8.
-Use different tenses and contexts. Keep sentences clear and natural.`;
+Output format: exactly 8 lines, numbered 1–8 like "1. ..." through "8. ...".
+No headings and no extra text.
+
+Now write the 8 sentences.`;
   } else if (mode === "grammar") {
     prompt = `You are an English grammar checker for Uzbek learners.
 Analyze this sentence: "${text}"
 
-Provide:
-1. ✅ Corrected sentence (if errors found, otherwise confirm it's correct)
-2. ❌ Errors found (list each error and why it's wrong)
-3. 📚 Grammar rule (name the tense or grammar point used)
-4. 💡 Explanation (simple explanation in both English and Uzbek)`;
+If it is correct, return exactly one line:
+OK: <sentence>
+
+If it has errors, return exactly these 3 lines:
+1) Corrected: <corrected sentence>
+2) Errors: <short bullet list of each error (including tense/grammar)> 
+3) Rule: <tense/grammar rule name>
+
+No other text. No explanations.`;
   }
 
   const response = await openai.chat.completions.create({
@@ -53,7 +59,8 @@ Provide:
     messages: [{ role: "user", content: prompt }],
   });
 
-  return response.choices[0]?.message?.content ?? "Javob olishda xatolik yuz berdi.";
+  const content = response.choices[0]?.message?.content ?? "";
+  return (content.trim() || "Javob olishda xatolik yuz berdi.").trim();
 }
 
 bot.start((ctx) => {
@@ -123,9 +130,13 @@ bot.on("text", async (ctx) => {
 });
 
 // Vercel serverless: avval 200 qayt, keyin process — timeout oldini olish uchun
-router.post("/telegram/webhook", (req: Request, res: Response) => {
+router.post("/telegram/webhook", async (req: Request, res: Response) => {
   res.sendStatus(200);
-  bot.handleUpdate(req.body).catch((err) => {
+
+  // Serverless runtime request promise tugaguncha ishlashni davom ettiradi.
+  // Telegram update qayta ishlashi AI so'rovlari bilan davom etgani uchun
+  // handleUpdate promise'ni "yutib yubormaslik" muhim.
+  return bot.handleUpdate(req.body).catch((err) => {
     console.error("Webhook error:", err);
   });
 });
