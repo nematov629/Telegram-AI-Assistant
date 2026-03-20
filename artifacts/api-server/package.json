@@ -1,31 +1,13 @@
-{
-  "name": "@workspace/api-server",
-  "version": "0.0.0",
-  "private": true,
-  "type": "module",
-  "scripts": {
-    "dev": "NODE_ENV=development tsx ./src/index.ts",
-    "build": "tsx ./build.ts",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
-  },
-  "dependencies": {
-    "@workspace/api-zod": "workspace:*",
-    "@workspace/db": "workspace:*",
-    "@workspace/integrations-openai-ai-server": "workspace:*",
-    "cookie-parser": "^1.4.7",
-    "cors": "^2",
-    "drizzle-orm": "catalog:",
-    "express": "^5",
-    "node-telegram-bot-api": "^0.66.0",
-    "telegraf": "^4.16.3"
-  },
-  "devDependencies": {
-    "@types/cookie-parser": "^1.4.10",
-    "@types/cors": "^2.8.19",
-    "@types/express": "^5.0.6",
-    "@types/node": "catalog:",
-    "@types/node-telegram-bot-api": "^0.64.8",
-    "esbuild": "^0.27.3",
-    "tsx": "catalog:"
-  }
+import express from "express";
+
+const app = express();
+
+app.get("/api/healthz", (req, res) => {
+  res.json({ status: "ok" });
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Server ishlayapti port ${PORT}`));
+"scripts": {
+  "start": "node server.js"
 }
