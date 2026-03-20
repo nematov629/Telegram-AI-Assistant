@@ -1,0 +1,24 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "artifacts/api-server/src/index.ts",
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": [
+          "lib/**",
+          "tsconfig.base.json",
+          "tsconfig.json",
+          "pnpm-workspace.yaml",
+          "package.json"
+        ]
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "artifacts/api-server/src/index.ts"
+    }
+  ]
+}

@@ -35,6 +35,8 @@ const allowlist = [
   "xlsx",
   "zod",
   "zod-validation-error",
+  "telegraf",
+  "node-fetch",
 ];
 
 async function buildAll() {

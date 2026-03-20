@@ -1,10 +1,26 @@
-import express from "express";
-
-const app = express();
-
-app.get("/api/healthz", (req, res) => {
-  res.json({ status: "ok" });
-});
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server ishlayapti port ${PORT}`));
+{
+  "name": "@workspace/api-server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "NODE_ENV=development tsx ./src/index.ts",
+    "build": "tsx ./build.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "start": "node dist/index.cjs"
+  },
+  "dependencies": {
+    "@workspace/api-zod": "workspace:*",
+    "@workspace/integrations-openai-ai-server": "workspace:*",
+    "cors": "^2",
+    "express": "^5",
+    "telegraf": "^4.16.3"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "catalog:",
+    "esbuild": "^0.27.3",
+    "tsx": "catalog:"
+  }
+}

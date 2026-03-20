@@ -48,7 +48,7 @@ Provide:
   }
 
   const response = await openai.chat.completions.create({
-    model: "gpt-5-mini",
+    model: "gpt-4o-mini",
     max_completion_tokens: 8192,
     messages: [{ role: "user", content: prompt }],
   });
@@ -122,27 +122,46 @@ bot.on("text", async (ctx) => {
   }
 });
 
-router.post("/telegram/webhook", async (req: Request, res: Response) => {
+// Vercel serverless: avval 200 qayt, keyin process — timeout oldini olish uchun
+router.post("/telegram/webhook", (req: Request, res: Response) => {
   res.sendStatus(200);
-  await bot.handleUpdate(req.body);
+  bot.handleUpdate(req.body).catch((err) => {
+    console.error("Webhook error:", err);
+  });
 });
 
 router.get("/telegram/setup-webhook", async (req: Request, res: Response) => {
-  const host = req.headers["x-forwarded-host"] ?? req.headers.host;
-  const protocol = req.headers["x-forwarded-proto"] ?? "https";
+  // Vercel URL ni avtomatik aniqlash
+  const host =
+    process.env.VERCEL_URL ??
+    (req.headers["x-forwarded-host"] as string | undefined) ??
+    req.headers.host;
+  const protocol =
+    process.env.VERCEL_URL
+      ? "https"
+      : ((req.headers["x-forwarded-proto"] as string | undefined) ?? "https");
   const webhookUrl = `${protocol}://${host}/api/telegram/webhook`;
 
-  const result = await bot.telegram.setWebhook(webhookUrl);
-  if (result) {
-    res.json({ success: true, webhookUrl });
-  } else {
-    res.status(500).json({ success: false });
+  try {
+    const result = await bot.telegram.setWebhook(webhookUrl);
+    if (result) {
+      res.json({ success: true, webhookUrl });
+    } else {
+      res.status(500).json({ success: false });
+    }
+  } catch (err) {
+    console.error("setWebhook error:", err);
+    res.status(500).json({ success: false, error: String(err) });
   }
 });
 
 router.get("/telegram/webhook-info", async (_req: Request, res: Response) => {
-  const info = await bot.telegram.getWebhookInfo();
-  res.json(info);
+  try {
+    const info = await bot.telegram.getWebhookInfo();
+    res.json(info);
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
 });
 
 export default router;
